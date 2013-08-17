@@ -194,6 +194,11 @@ class File(Group):
             except (UnicodeError, LookupError):
                 pass
 
+            # Read family member size from file when opening existing
+            # files with the family driver
+            if driver == 'family' and mode in ('r', 'r+') and 'memb_size' not in kwds:
+                kwds['memb_size'] = h5f.FAMILY_DEFAULT
+
             fapl = make_fapl(driver, libver, **kwds)
             fid = make_fid(name, mode, userblock_size, fapl)
 

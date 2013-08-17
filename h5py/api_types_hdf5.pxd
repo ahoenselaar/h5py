@@ -98,6 +98,8 @@ cdef extern from "hdf5.h":
   int H5F_OBJ_ALL
   int H5F_OBJ_LOCAL
 
+  int H5F_FAMILY_DEFAULT      # Retrieve family member size when opening existing files
+
   ctypedef enum H5F_libver_t:
     H5F_LIBVER_EARLIEST        #/* Use the earliest possible format for storing objects */
     H5F_LIBVER_LATEST          #/* Use the latest possible format available for storing objects*/

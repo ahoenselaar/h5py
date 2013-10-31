@@ -1,14 +1,11 @@
-#+
-# 
-# This file is part of h5py, a low-level Python interface to the HDF5 library.
-# 
-# Copyright (C) 2008 Andrew Collette
-# http://h5py.alfven.org
-# License: BSD  (See LICENSE.txt for full license)
-# 
-# $Date$
-# 
-#-
+# This file is part of h5py, a Python interface to the HDF5 library.
+#
+# http://www.h5py.org
+#
+# Copyright 2008-2013 Andrew Collette and contributors
+#
+# License:  Standard 3-clause BSD; see "license.txt" for full license terms
+#           and contributor agreement.
 
 """
     High-level access to HDF5 dataspace selections
@@ -549,8 +546,6 @@ def _translate_slice(exp, length):
 
     if step < 1:
         raise ValueError("Step must be >= 1 (got %d)" % step)
-    if stop == start:
-        raise ValueError("Zero-length selections are not allowed")
     if stop < start:
         raise ValueError("Reverse-order selections are not allowed")
 

@@ -1,15 +1,11 @@
-#+
+# This file is part of h5py, a Python interface to the HDF5 library.
 #
-# This file is part of h5py, a low-level Python interface to the HDF5 library.
+# http://www.h5py.org
 #
-# Copyright (C) 2008 Andrew Collette
-# http://h5py.alfven.org
-# License: BSD  (See LICENSE.txt for full license)
+# Copyright 2008-2013 Andrew Collette and contributors
 #
-# $Date$
-#
-#-
-
+# License:  Standard 3-clause BSD; see "license.txt" for full license terms
+#           and contributor agreement.
 """
     Provides access to the low-level HDF5 "H5D" dataset interface.
 """
@@ -76,12 +72,14 @@ def create(ObjectID loc not None, object name, TypeID tid not None,
                      pdefault(dcpl), pdefault(dapl))
         return DatasetID.open(dsid)
 
-def open(ObjectID loc not None, char* name):
-    """ (ObjectID loc, STRING name) => DatasetID
+def open(ObjectID loc not None, char* name, PropID dapl=None):
+    """ (ObjectID loc, STRING name, PropID dapl=None) => DatasetID
 
-        Open an existing dataset attached to a group or file object, by name.
+    Open an existing dataset attached to a group or file object, by name.
+
+    If specified, dapl may be a dataset access property list.
     """
-    return DatasetID.open(H5Dopen(loc.id, name))
+    return DatasetID.open(H5Dopen2(loc.id, name, pdefault(dapl)))
 
 # --- Proxy functions for safe(r) threading -----------------------------------
 
@@ -315,6 +313,15 @@ cdef class DatasetID(ObjectID):
             used when this dataset was created.
         """
         return propwrap(H5Dget_create_plist(self.id))
+
+
+
+    def get_access_plist(self):
+        """ () => PropDAID
+
+            Create an return a new copy of the dataset access property list.
+        """
+        return propwrap(H5Dget_access_plist(self.id))
 
 
     def get_offset(self):

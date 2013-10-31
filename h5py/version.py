@@ -1,9 +1,18 @@
+# This file is part of h5py, a Python interface to the HDF5 library.
+#
+# http://www.h5py.org
+#
+# Copyright 2008-2013 Andrew Collette and contributors
+#
+# License:  Standard 3-clause BSD; see "license.txt" for full license terms
+#           and contributor agreement.
+
 from . import h5 as _h5
 from distutils.version import StrictVersion as _sv
 import sys
 import numpy
 
-version = "2.2.0b1"
+version = "2.2.0"
 _exp = _sv(version)
 
 version_tuple = _exp.version + ((''.join(str(x) for x in _exp.prerelease),) if _exp.prerelease is not None else ('',))

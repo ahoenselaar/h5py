@@ -1,3 +1,12 @@
+# This file is part of h5py, a Python interface to the HDF5 library.
+#
+# http://www.h5py.org
+#
+# Copyright 2008-2013 Andrew Collette and contributors
+#
+# License:  Standard 3-clause BSD; see "license.txt" for full license terms
+#           and contributor agreement.
+
 import posixpath as pp
 import sys
 import numpy
@@ -11,10 +20,6 @@ from . import selections2 as sel2
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
-
-    if basetype.kind == 'O':
-        # Special-dtype fields break indexing
-        basetype = numpy.dtype('O')
 
     if len(names) == 0:  # Not compound, or we want all fields
         return basetype
@@ -107,11 +112,34 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
 
     return dset_id
 
+
+class AstypeContext(object):
+
+    def __init__(self, dset, dtype):
+        self._dset = dset
+        self._dtype = numpy.dtype(dtype)
+
+    def __enter__(self):
+        self._dset._local.astype = self._dtype
+
+    def __exit__(self, *args):
+        self._dset._local.astype = None
+
+
 class Dataset(HLObject):
 
     """
         Represents an HDF5 dataset
     """
+        
+    def astype(self, dtype):
+        """ Get a context manager allowing you to perform reads to a
+        different destination type, e.g.:
+
+        >>> with dataset.astype('f8'):
+        ...     double_precision = dataset[0:100:2]
+        """
+        return AstypeContext(self, dtype)
 
     @property
     def dims(self):
@@ -203,12 +231,16 @@ class Dataset(HLObject):
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
         """
+        from threading import local
+
         if not isinstance(bind, h5d.DatasetID):
             raise ValueError("%s is not a DatasetID" % bind)
         HLObject.__init__(self, bind)
 
         self._dcpl = self.id.get_create_plist()
         self._filters = filters.get_filters(self._dcpl)
+        self._local = local()
+        self._local.astype = None
 
     def resize(self, size, axis=None):
         """ Resize the dataset, or the specified axis.
@@ -328,9 +360,12 @@ class Dataset(HLObject):
 
             return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
-        # This is necessary because in the case of array types, NumPy
-        # discards the array information at the top level.
-        new_dtype = readtime_dtype(self.id.dtype, names)
+        if self._local.astype is not None:
+            new_dtype = readtime_dtype(self._local.astype, names)
+        else:
+            # This is necessary because in the case of array types, NumPy
+            # discards the array information at the top level.
+            new_dtype = readtime_dtype(self.id.dtype, names)
         mtype = h5t.py_create(new_dtype)
 
         # === Special-case region references ====
@@ -368,6 +403,8 @@ class Dataset(HLObject):
             arr = numpy.ndarray(selection.mshape, dtype=new_dtype)
             for mspace, fspace in selection:
                 self.id.read(mspace, fspace, arr, mtype)
+            if len(names) == 1:
+                arr = arr[names[0]]
             if selection.mshape is None:
                 return arr[()]
             return arr
@@ -378,7 +415,7 @@ class Dataset(HLObject):
         selection = sel.select(self.shape, args, dsid=self.id)
 
         if selection.nselect == 0:
-            return numpy.ndarray((0,), dtype=new_dtype)
+            return numpy.ndarray(selection.mshape, dtype=new_dtype)
 
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
@@ -421,7 +458,26 @@ class Dataset(HLObject):
 
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
-        if self.dtype.kind == "O" or \
+        vlen = h5t.check_dtype(vlen=self.dtype)
+        if vlen not in (bytes, unicode, None):
+            try:
+                val = numpy.asarray(val, dtype=vlen)
+            except ValueError:
+                try:
+                    val = numpy.array([numpy.array(x, dtype=vlen)
+                                       for x in val], dtype=self.dtype)
+                except ValueError:
+                    pass
+            if vlen == val.dtype:
+                if val.ndim > 1:
+                    tmp = numpy.empty(shape=val.shape[:-1], dtype=object)
+                    tmp.ravel()[:] = [i for i in val.reshape(
+                        (numpy.product(val.shape[:-1]), val.shape[-1]))]
+                else:
+                    tmp = numpy.array([None], dtype=object)
+                    tmp[0] = val
+                val = tmp
+        elif self.dtype.kind == "O" or \
           (self.dtype.kind == 'V' and \
           (not isinstance(val, numpy.ndarray) or val.dtype.kind != 'V') and \
           (self.dtype.subdtype == None)):
